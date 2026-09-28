@@ -59,7 +59,7 @@ document a minute.
 A value with nothing to measure yet is left out rather than sent as zero. An application collector
 is `{ units, values() }`, where `values` may be async and every name has a unit.
 
-**Errors.** Sentry, errors only (`tracesSampleRate: 0`, `sendDefaultPii: false`), with the
+**Errors.** Sentry, errors only (no sample rate, `sendDefaultPii: false`), with the
 environment and the release (`KAMAL_VERSION`). Of a request, an error keeps the method, the URL
 without its query and the `User-Agent` value, and nothing else: no cookie, no body, no other header.
 
@@ -110,6 +110,10 @@ What X-Ray makes of them, which the collector's `awsxray` exporter decides:
 - **A call names its dependency.** A client span gets a `peer.service`: `mongodb` or `redis` from the
   database system, or the host of an outbound HTTP call. The exporter names the downstream node by
   it, so the service map shows each dependency once rather than a node per query, command or method.
+
+Sentry records no spans. Its sample rate is left unset rather than set to 0: Sentry counts any rate
+as spans on and then instruments HTTP, Koa and the databases itself, and those spans reached the
+exporter too, a second SERVER span per request that ignored `TRACES_IGNORED_PATHS`.
 
 OpenTelemetry says what goes wrong only through its diag logger and its global error handler, and
 both are silent until set. Here both write to the JSON log with `"component": "opentelemetry"`: an

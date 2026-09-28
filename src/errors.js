@@ -30,10 +30,11 @@ export async function installErrors(settings, overrides = {}) {
     environment: settings.environment(settings.sentryEnvironment),
     release: settings.release,
     sendDefaultPii: false,
-    // Errors only. Traces are OpenTelemetry's, to X-Ray, so Sentry records none and leaves the
-    // OpenTelemetry setup, and the ESM loader hook it would register for its own instrumentation,
-    // to this package.
-    tracesSampleRate: 0,
+    // Errors only. Traces are OpenTelemetry's, to X-Ray, so Sentry leaves the OpenTelemetry setup,
+    // and the ESM loader hook it would register for its own instrumentation, to this package. The
+    // sample rate stays unset, not 0: Sentry counts any rate as spans on and then registers its own
+    // HTTP, Koa and database instrumentation, whose spans reach this package's exporter beside the
+    // SDK's own, twice per request and blind to TRACES_IGNORED_PATHS.
     skipOpenTelemetrySetup: true,
     registerEsmLoaderHooks: false,
     beforeSend: scrubEvent,

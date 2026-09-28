@@ -6,6 +6,7 @@ import { recordingServer, runFixture } from "./helpers/process.js";
 let collector;
 let target;
 let spans;
+let withSentry;
 
 // The spans a fixture's process exported, read from the OTLP requests the collector stand-in got.
 function exportedSpans(requests) {
@@ -28,6 +29,20 @@ before(async () => {
   });
 
   spans = exportedSpans(collector.requests);
+
+  // The same with errors on as well, as every application on the platform runs.
+  const both = await recordingServer();
+  const sentry = await recordingServer();
+  await runFixture("requests.js", {
+    OTEL_EXPORTER_OTLP_ENDPOINT: both.url,
+    OTEL_SERVICE_NAME: "senalysis-api",
+    TRACES_IGNORED_PATHS: "/api/health,/socket.io/",
+    FIXTURE_TARGET: target.url,
+    SENTRY_DSN: `${sentry.url.replace("http://", "http://publickey@")}/1`,
+  });
+  withSentry = exportedSpans(both.requests);
+  await both.close();
+  await sentry.close();
 });
 
 after(async () => {
@@ -100,4 +115,24 @@ test("a call made inside its run is a span of its trace", () => {
 
 test("a unit ended with an error is a failed span", () => {
   assert.equal(action("socket POSTS_ADD")?.status?.code, STATUS_ERROR);
+});
+
+test("with errors on too, an ignored path still starts no trace", () => {
+  assert.equal(
+    withSentry.filter(
+      (span) => attribute(span, "url.path")?.stringValue === "/api/health",
+    ).length,
+    0,
+  );
+});
+
+test("with errors on too, a request is one SERVER span, not one from each SDK", () => {
+  assert.equal(
+    withSentry.filter(
+      (span) =>
+        span.kind === SPAN_KIND_SERVER &&
+        attribute(span, "url.path")?.stringValue === "/api/things",
+    ).length,
+    1,
+  );
 });
