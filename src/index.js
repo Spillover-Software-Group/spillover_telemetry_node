@@ -68,10 +68,24 @@ export async function runJob(job, fn) {
 }
 
 // Sends what is still buffered before the process exits: queued Sentry events, and the spans the
-// batch processor has not exported yet.
+// batch processor has not exported yet. What cannot be sent is said, in the log, rather than lost
+// without a word.
 export async function flushTelemetry(timeoutMs = 2000) {
-  await Promise.allSettled([
+  const [errors, traces] = await Promise.allSettled([
     state.Sentry?.flush(timeoutMs),
     state.sdk?.shutdown(),
   ]);
+
+  if (errors.status === "rejected" || errors.value === false) {
+    getLogger().warn(
+      { component: "sentry", err: errors.reason },
+      "Sentry could not send its queued events before exit",
+    );
+  }
+  if (traces.status === "rejected") {
+    getLogger().warn(
+      { component: "opentelemetry", err: traces.reason },
+      "OpenTelemetry could not send its buffered spans before exit",
+    );
+  }
 }

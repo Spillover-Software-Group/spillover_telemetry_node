@@ -21,7 +21,10 @@ if (state.settings.traces) {
   const contextManager = state.Sentry
     ? new state.Sentry.SentryContextManager()
     : undefined;
-  Object.assign(state, await installTraces({ contextManager }));
+  Object.assign(
+    state,
+    await installTraces({ contextManager, logger: state.logger }),
+  );
 } else if (state.Sentry) {
   // With no SDK to register one, Sentry's context manager is registered on its own, or every
   // request and job would share one scope.

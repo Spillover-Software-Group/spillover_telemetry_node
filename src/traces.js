@@ -1,7 +1,38 @@
 // Traces go to the OTLP endpoint, which on the platform is the host's collector, forwarding to
 // X-Ray. Nothing OpenTelemetry is imported until this runs, so a process with no endpoint loads none
 // of it.
-export async function installTraces({ contextManager } = {}) {
+// OpenTelemetry says what goes wrong only through its diag logger and its global error handler, and
+// both are silent until set: an export that fails, every minute, for good, writes nothing. These
+// route both into the application's JSON log, as lines of their own.
+function reportThrough(logger, api, setGlobalErrorHandler) {
+  const fields = { component: "opentelemetry" };
+
+  setGlobalErrorHandler((error) => {
+    logger.error(
+      {
+        ...fields,
+        err: error instanceof Error ? error : new Error(String(error)),
+      },
+      "OpenTelemetry could not export or process spans",
+    );
+  });
+
+  // Where the deploy names OTEL_LOG_LEVEL, the SDK sets its own logger at that level instead.
+  if (process.env.OTEL_LOG_LEVEL) return;
+
+  api.diag.setLogger(
+    {
+      error: (message, ...args) => logger.error({ ...fields, args }, message),
+      warn: (message, ...args) => logger.warn({ ...fields, args }, message),
+      info: (message, ...args) => logger.info({ ...fields, args }, message),
+      debug: (message, ...args) => logger.debug({ ...fields, args }, message),
+      verbose: (message, ...args) => logger.trace({ ...fields, args }, message),
+    },
+    api.DiagLogLevel.WARN,
+  );
+}
+
+export async function installTraces({ contextManager, logger } = {}) {
   const { register } = await import("node:module");
   // The applications are ES modules, whose imports the instrumentations see only through
   // import-in-the-middle's loader hook, registered before the application's first import.
@@ -9,6 +40,7 @@ export async function installTraces({ contextManager } = {}) {
 
   const [
     api,
+    { setGlobalErrorHandler },
     { NodeSDK },
     { OTLPTraceExporter },
     { HttpInstrumentation },
@@ -19,6 +51,7 @@ export async function installTraces({ contextManager } = {}) {
     { IORedisInstrumentation },
   ] = await Promise.all([
     import("@opentelemetry/api"),
+    import("@opentelemetry/core"),
     import("@opentelemetry/sdk-node"),
     import("@opentelemetry/exporter-trace-otlp-http"),
     import("@opentelemetry/instrumentation-http"),
@@ -28,6 +61,8 @@ export async function installTraces({ contextManager } = {}) {
     import("@opentelemetry/instrumentation-mongodb"),
     import("@opentelemetry/instrumentation-ioredis"),
   ]);
+
+  if (logger) reportThrough(logger, api, setGlobalErrorHandler);
 
   const sdk = new NodeSDK({
     // Reads OTEL_EXPORTER_OTLP_ENDPOINT and sends to its /v1/traces. The service name is the SDK's

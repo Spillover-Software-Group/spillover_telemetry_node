@@ -6,16 +6,17 @@ import { recordingServer, runFixture } from "./helpers/process.js";
 let collector;
 let target;
 let spans;
+let output;
 
 before(async () => {
   collector = await recordingServer();
   target = await recordingServer();
 
-  await runFixture("traces.js", {
+  ({ stdout: output } = await runFixture("traces.js", {
     OTEL_EXPORTER_OTLP_ENDPOINT: collector.url,
     OTEL_SERVICE_NAME: "senalysis-data-exchange",
     FIXTURE_TARGET: target.url,
-  });
+  }));
 
   spans = collector.requests
     .filter(({ path }) => path === "/v1/traces")
@@ -62,5 +63,17 @@ test("only traces are sent: no metrics, no logs", () => {
   assert.deepEqual(
     [...new Set(collector.requests.map(({ path }) => path))],
     ["/v1/traces"],
+  );
+});
+
+test("a process whose exports succeed writes no OpenTelemetry line", () => {
+  const lines = output
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+
+  assert.deepEqual(
+    lines.filter((line) => line.component === "opentelemetry"),
+    [],
   );
 });

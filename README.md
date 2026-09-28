@@ -11,7 +11,7 @@ loaded.
 ## Installing it
 
 ```json
-"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.0"
+"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.1"
 ```
 
 Pinned to a tag. Then start the process through it, so it is set up before the application's first
@@ -86,7 +86,13 @@ pipeline. A call to Redis, Mongo or another service is traced only inside a requ
 worker's own polling is not a trace a second. `/health` is not traced. The sampler is the SDK's, so
 `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG` work as documented.
 
-Before a process exits, `await flushTelemetry()` sends what is still buffered.
+OpenTelemetry says what goes wrong only through its diag logger and its global error handler, and
+both are silent until set. Here both write to the JSON log with `"component": "opentelemetry"`: an
+export that fails is an error line naming the cause, and other warnings are warning lines. Setting
+`OTEL_LOG_LEVEL` hands diag to the SDK at that level instead.
+
+Before a process exits, `await flushTelemetry()` sends what is still buffered, and logs what it
+could not send.
 
 ## The variables
 
