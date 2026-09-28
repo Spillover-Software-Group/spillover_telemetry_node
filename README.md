@@ -63,12 +63,19 @@ is `{ units, values() }`, where `values` may be async and every name has a unit.
 environment and the release (`KAMAL_VERSION`). Of a request, an error keeps the method, the URL
 without its query and the `User-Agent` value, and nothing else: no cookie, no body, no other header.
 
+**Sentry is for defects, not for a platform saying no.** A job that fails because a platform
+refused (the application's own classified error, retriable or not, auth or not) is counted in
+`JobsFailed` and logged with its fields, and does not reach Sentry: the alarm and the log group are
+for that. A job that fails on anything else (a `TypeError`, a database error, an unclassified
+throw) reaches Sentry once, at its final failure, with the same fields as tags. The application
+applies the rule where it calls `captureJobFailure`, because only it knows its classified error.
+
 - `identifyUser({ id, email, ipAddress })` names the user for the current request or job.
 - `clientAddress()` is Koa middleware that gives each request a scope of its own, named by `ctx.ip`,
   which is the client's only with `app.proxy = true` behind the load balancer and kamal-proxy.
 - `runJob({ queue, name, id }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`, and in
   a trace of its own.
-- `captureJobFailure(fields, error)` reports a failed job with `queue`, `job`, `job_id`,
+- `captureJobFailure(fields, error)`, for a final failure that is a defect, reports a failed job with `queue`, `job`, `job_id`,
   `account_id`, `error_class` and `wrapped_by` as tags, and the rest of `fields` as the `job`
   context. Where the error wraps another (`cause`), the wrapped one is reported, so failures group
   by what went wrong. `isFinalFailure(job, error)` says whether BullMQ will try the job again.
