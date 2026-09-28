@@ -32,11 +32,21 @@ function traced({ queue, name, id }, fn) {
     "messaging.destination.name": queue,
     "messaging.operation.type": "process",
     "messaging.message.id": String(id),
+    // The same three under names X-Ray accepts as annotation keys (letters, digits, underscores),
+    // and the list the exporter reads to index them, so `annotation.job_name = "messages.fetch"`
+    // finds a task's traces without a change to the collector.
+    job_queue: queue,
+    job_name: name,
+    job_id: String(id),
+    "aws.xray.annotations": ["job_queue", "job_name", "job_id"],
   };
 
+  // SERVER, not CONSUMER, which the semantic conventions would say: X-Ray's exporter names a root
+  // segment after the service only for a SERVER span, and after the span otherwise, which filed
+  // every task as a service of its own and hid all of them from a search by the application's name.
   return tracer.startActiveSpan(
     `${queue} ${name}`,
-    { kind: api.SpanKind.CONSUMER, attributes },
+    { kind: api.SpanKind.SERVER, attributes },
     async (span) => {
       try {
         return await fn();

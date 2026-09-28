@@ -11,7 +11,7 @@ loaded.
 ## Installing it
 
 ```json
-"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.1"
+"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.2"
 ```
 
 Pinned to a tag. Then start the process through it, so it is set up before the application's first
@@ -86,6 +86,20 @@ pipeline. A call to Redis, Mongo or another service is traced only inside a requ
 worker's own polling is not a trace a second. `/health` is not traced. The sampler is the SDK's, so
 `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG` work as documented.
 
+What X-Ray makes of them, which the collector's `awsxray` exporter decides:
+
+- **A job's span is SERVER kind, on purpose.** The semantic conventions would say CONSUMER, but the
+  exporter names a root segment after the service only for a SERVER span, and after the span
+  otherwise. As CONSUMER, every task was a service of its own and a search by the application's name
+  found none of them. Do not "correct" it.
+- **A job is searchable by its task.** Its span carries `job_queue`, `job_name` and `job_id`, and
+  lists them in `aws.xray.annotations`, which the exporter indexes as annotations with no change to
+  the collector: `annotation.job_name = "messages.fetch"`. The names use underscores because X-Ray
+  filters only annotation keys made of letters, digits and underscores.
+- **A call names its dependency.** A client span gets a `peer.service`: `mongodb` or `redis` from the
+  database system, or the host of an outbound HTTP call. The exporter names the downstream node by
+  it, so the service map shows each dependency once rather than a node per query, command or method.
+
 OpenTelemetry says what goes wrong only through its diag logger and its global error handler, and
 both are silent until set. Here both write to the JSON log with `"component": "opentelemetry"`: an
 export that fails is an error line naming the cause, and other warnings are warning lines. Setting
@@ -116,6 +130,7 @@ mise install
 npm install
 npm run check   # Biome, read-only
 npm test        # node:test, against local servers standing in for Sentry and the collector
+node bin/check-xray-names.js   # the spans through the real awsxray exporter, in Docker
 ```
 
 Node 22.12 or newer, and 24. There is no CI: the gate is `npm run check && npm test`, by exit code.

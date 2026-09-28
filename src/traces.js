@@ -32,6 +32,29 @@ function reportThrough(logger, api, setGlobalErrorHandler) {
   );
 }
 
+// X-Ray's exporter names a call's downstream node after its `peer.service`, and without one after the
+// operation, so every Mongo query, Redis command and HTTP method became a service of its own on the
+// map. This names the dependency instead: the database system for Mongo and Redis, the host for an
+// outbound HTTP call. It runs as the span starts, where the instrumentations put those attributes.
+function dependencyNamer(api) {
+  return {
+    onStart(span) {
+      if (span.kind !== api.SpanKind.CLIENT) return;
+      if (span.attributes["peer.service"] !== undefined) return;
+
+      const dependency =
+        span.attributes["db.system.name"] ??
+        span.attributes["db.system"] ??
+        span.attributes["server.address"];
+      if (dependency !== undefined)
+        span.setAttribute("peer.service", String(dependency));
+    },
+    onEnd: () => undefined,
+    forceFlush: () => Promise.resolve(),
+    shutdown: () => Promise.resolve(),
+  };
+}
+
 export async function installTraces({ contextManager, logger } = {}) {
   const { register } = await import("node:module");
   // The applications are ES modules, whose imports the instrumentations see only through
@@ -41,7 +64,7 @@ export async function installTraces({ contextManager, logger } = {}) {
   const [
     api,
     { setGlobalErrorHandler },
-    { NodeSDK },
+    { NodeSDK, tracing },
     { OTLPTraceExporter },
     { HttpInstrumentation },
     { UndiciInstrumentation },
@@ -65,9 +88,13 @@ export async function installTraces({ contextManager, logger } = {}) {
   if (logger) reportThrough(logger, api, setGlobalErrorHandler);
 
   const sdk = new NodeSDK({
-    // Reads OTEL_EXPORTER_OTLP_ENDPOINT and sends to its /v1/traces. The service name is the SDK's
-    // own OTEL_SERVICE_NAME, never a string here.
-    traceExporter: new OTLPTraceExporter(),
+    // The exporter reads OTEL_EXPORTER_OTLP_ENDPOINT and sends to its /v1/traces, in batches the
+    // processor sizes from the OTEL_BSP_* variables. The service name is the SDK's own
+    // OTEL_SERVICE_NAME, never a string here.
+    spanProcessors: [
+      dependencyNamer(api),
+      new tracing.BatchSpanProcessor(new OTLPTraceExporter()),
+    ],
     // Traces only: CloudWatch has the metrics (embedded in the log) and the logs.
     metricReaders: [],
     logRecordProcessors: [],
