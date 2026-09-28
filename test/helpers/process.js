@@ -21,6 +21,7 @@ const PACKAGE_VARIABLES = [
   "KAMAL_DESTINATION",
   "OTEL_EXPORTER_OTLP_ENDPOINT",
   "OTEL_SERVICE_NAME",
+  "TRACES_IGNORED_PATHS",
 ];
 
 // Runs a fixture the way an application runs: `node --import @spillover/telemetry/register`. Resolves

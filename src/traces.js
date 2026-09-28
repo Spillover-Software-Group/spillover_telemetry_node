@@ -55,7 +55,19 @@ function dependencyNamer(api) {
   };
 }
 
-export async function installTraces({ contextManager, logger } = {}) {
+// Whether an incoming request's path is one that starts no trace (settings' tracesIgnoredPaths).
+export function isIgnoredPath(url, ignoredPaths) {
+  const path = (url ?? "").split("?")[0];
+  return ignoredPaths.some((entry) =>
+    entry.endsWith("/") ? path.startsWith(entry) : path === entry,
+  );
+}
+
+export async function installTraces({
+  contextManager,
+  logger,
+  ignoredPaths = ["/health"],
+} = {}) {
   const { register } = await import("node:module");
   // The applications are ES modules, whose imports the instrumentations see only through
   // import-in-the-middle's loader hook, registered before the application's first import.
@@ -103,11 +115,11 @@ export async function installTraces({ contextManager, logger } = {}) {
     // lock renewals, stalled checks, a dispatcher's polls. None of that starts a trace. A call is
     // traced only inside something already traced, a request or a job (runJob), so a trace is a
     // unit of work and not a heartbeat. The health check is the proxy and the load balancer asking
-    // every few seconds, and answers nothing a trace could add to.
+    // every few seconds, and answers nothing a trace could add to; so is a transport's own polling.
     instrumentations: [
       new HttpInstrumentation({
         ignoreIncomingRequestHook: (request) =>
-          request.url === "/health" || request.url?.startsWith("/health?"),
+          isIgnoredPath(request.url, ignoredPaths),
         requireParentforOutgoingSpans: true,
       }),
       new UndiciInstrumentation({ requireParentforSpans: true }),

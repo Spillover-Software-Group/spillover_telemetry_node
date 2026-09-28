@@ -3,6 +3,7 @@ import { readSettings } from "./settings.js";
 import { state } from "./state.js";
 
 export {
+  captureError,
   captureJobFailure,
   clientAddress,
   identifyUser,
@@ -15,6 +16,7 @@ export {
   runtimeCollector,
   startMetrics,
 } from "./metrics.js";
+export { startRequest } from "./requests.js";
 export { readSettings } from "./settings.js";
 
 // The logger register set up, or, in a process started without it, one made from the environment.

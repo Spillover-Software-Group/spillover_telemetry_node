@@ -75,6 +75,14 @@ applies the rule where it calls `captureJobFailure`, because only it knows its c
   which is the client's only with `app.proxy = true` behind the load balancer and kamal-proxy.
 - `runJob({ queue, name, id }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`, and in
   a trace of its own.
+- `startRequest(name, annotations)` is a unit of work the SDK does not see as a request, such as a
+  Socket.IO action: `run(fn)` runs `fn` in a scope and a trace of its own, and `end(error)` ends the
+  trace's span, as failed where an error is given, whenever the unit is answered, which may be long
+  after `run` returned. `identifyUser` inside `run` names that unit's user alone.
+- `captureError(error, { tags, context })` reports an error the application has decided is a defect,
+  with searchable tags and a `details` context. Sentry sends an Error object once however often it
+  is captured, so an error logged where it was caught and reported again by the failure it caused is
+  one event.
 - `captureJobFailure(fields, error)`, for a final failure that is a defect, reports a failed job with `queue`, `job`, `job_id`,
   `account_id`, `error_class` and `wrapped_by` as tags, and the rest of `fields` as the `job`
   context. Where the error wraps another (`cause`), the wrapped one is reported, so failures group
@@ -83,7 +91,8 @@ applies the rule where it calls `captureJobFailure`, because only it knows its c
 **Traces.** OpenTelemetry's Node SDK, exporting OTLP over HTTP to the endpoint, with the http,
 undici (fetch), Express, Koa, MongoDB and ioredis instrumentations, and no metrics or logs
 pipeline. A call to Redis, Mongo or another service is traced only inside a request or a job, so a
-worker's own polling is not a trace a second. `/health` is not traced. The sampler is the SDK's, so
+worker's own polling is not a trace a second. A request for one of `TRACES_IGNORED_PATHS` (by
+default `/health`) is not traced: a health check, or a transport's own polling. The sampler is the SDK's, so
 `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG` work as documented.
 
 What X-Ray makes of them, which the collector's `awsxray` exporter decides:
@@ -92,6 +101,8 @@ What X-Ray makes of them, which the collector's `awsxray` exporter decides:
   exporter names a root segment after the service only for a SERVER span, and after the span
   otherwise. As CONSUMER, every task was a service of its own and a search by the application's name
   found none of them. Do not "correct" it.
+- **So is a unit started with `startRequest`**, and its annotations become X-Ray annotations the same
+  way (keys X-Ray would refuse are left out).
 - **A job is searchable by its task.** Its span carries `job_queue`, `job_name` and `job_id`, and
   lists them in `aws.xray.annotations`, which the exporter indexes as annotations with no change to
   the collector: `annotation.job_name = "messages.fetch"`. The names use underscores because X-Ray
@@ -118,6 +129,7 @@ could not send.
 | `SENTRY_ENVIRONMENT` | The environment errors report, where it is not the destination |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | The switch for traces, and where they go |
 | `OTEL_SERVICE_NAME` | The service traces are attributed to |
+| `TRACES_IGNORED_PATHS` | Comma-separated paths whose incoming requests start no trace; an entry ending in `/` covers every path under it. Default `/health` |
 | `KAMAL_DESTINATION` | The environment every signal reports. Outside a container, `NODE_ENV` |
 | `KAMAL_VERSION` | The release errors are filed under |
 

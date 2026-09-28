@@ -23,7 +23,11 @@ if (state.settings.traces) {
     : undefined;
   Object.assign(
     state,
-    await installTraces({ contextManager, logger: state.logger }),
+    await installTraces({
+      contextManager,
+      logger: state.logger,
+      ignoredPaths: state.settings.tracesIgnoredPaths,
+    }),
   );
 } else if (state.Sentry) {
   // With no SDK to register one, Sentry's context manager is registered on its own, or every

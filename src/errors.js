@@ -83,6 +83,21 @@ export function clientAddress() {
   };
 }
 
+// Reports an error that is a defect: the application decides which errors are its own to fix and
+// calls this for those. `tags` are searchable, `context` is shown beside the event. Sentry sends an
+// Error object once however often it is captured, so an error that is caught, logged and then
+// carried on by the failure it caused is one event, not two.
+export function captureError(error, { tags = {}, context } = {}) {
+  const { Sentry } = state;
+  if (!Sentry || !(error instanceof Error)) return;
+
+  Sentry.withScope((scope) => {
+    scope.setTags(withoutEmpty(tags));
+    if (context) scope.setContext("details", withoutEmpty(context));
+    Sentry.captureException(error);
+  });
+}
+
 // Whether a job has failed for the last time: out of attempts, or failed by an error BullMQ does
 // not retry. BullMQ emits `failed` after every attempt, retries included.
 export function isFinalFailure(job, error) {

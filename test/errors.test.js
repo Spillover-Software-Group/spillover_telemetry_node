@@ -10,6 +10,7 @@ import {
 let sentry;
 let requestEvent;
 let jobEvents;
+let scopeEvents;
 
 before(async () => {
   sentry = await recordingServer();
@@ -25,6 +26,10 @@ before(async () => {
 
   await runFixture("jobs.js", env);
   jobEvents = sentryEvents(sentry.requests);
+  sentry.requests.length = 0;
+
+  await runFixture("request-scopes.js", env);
+  scopeEvents = sentryEvents(sentry.requests);
 });
 
 after(() => sentry.close());
@@ -131,4 +136,50 @@ test("with no DSN and no endpoint, neither Sentry nor OpenTelemetry is loaded", 
     .find((l) => l.includes('"sentry"'));
 
   assert.deepEqual(JSON.parse(line), { sentry: false, otel: false });
+});
+
+function scopeEvent(message) {
+  return scopeEvents.find(
+    (event) => event.exception?.values?.[0]?.value === message,
+  );
+}
+
+test("two units of work started at once each keep their own user", () => {
+  assert.deepEqual(
+    [
+      scopeEvent("raised in POSTS_GET")?.user?.id,
+      scopeEvent("raised in REVIEWS_GET")?.user?.id,
+    ],
+    ["user-1", "user-2"],
+  );
+});
+
+test("captureError reports an error with its tags", () => {
+  const event = scopeEvent(
+    "Cannot read properties of undefined (reading 'type')",
+  );
+
+  assert.equal(event?.tags?.action, "BUSINESS_TYPES_GET");
+});
+
+test("captureError puts its context beside the event, without empty values", () => {
+  const event = scopeEvent(
+    "Cannot read properties of undefined (reading 'type')",
+  );
+
+  assert.deepEqual(event?.contexts?.details, { socket: "abc" });
+});
+
+test("captureError reports the same error once", () => {
+  const events = scopeEvents.filter(
+    (event) =>
+      event.exception?.values?.[0]?.value ===
+      "Cannot read properties of undefined (reading 'type')",
+  );
+
+  assert.equal(events.length, 1);
+});
+
+test("captureError sends nothing for what is not an Error", () => {
+  assert.equal(scopeEvents.length, 4);
 });

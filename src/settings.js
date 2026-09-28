@@ -5,6 +5,16 @@ function present(value) {
   return value === undefined || value === "" ? undefined : value;
 }
 
+// The paths whose incoming requests start no trace: a load balancer's and a proxy's health checks,
+// asking every few seconds, and a transport's own requests. An entry is one path, or, ending in "/",
+// every path under it.
+function pathList(value) {
+  return (present(value) ?? "/health")
+    .split(",")
+    .map((path) => path.trim())
+    .filter(Boolean);
+}
+
 // A namespace on its own is not a configuration: a document with no application and no role is a
 // series nobody can find, so a deploy that sets one of the three says so at start.
 function required(env, name) {
@@ -31,6 +41,7 @@ export function readSettings(env = process.env) {
     // Kamal names the running version after the commit.
     release: present(env.KAMAL_VERSION),
     otlpEndpoint: present(env.OTEL_EXPORTER_OTLP_ENDPOINT),
+    tracesIgnoredPaths: pathList(env.TRACES_IGNORED_PATHS),
     // Every destination runs with NODE_ENV=production, so NODE_ENV cannot tell staging from
     // production; the destination Kamal deployed to can, and Kamal sets it in every container.
     destination,

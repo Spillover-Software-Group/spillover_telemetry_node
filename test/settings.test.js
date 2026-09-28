@@ -99,3 +99,15 @@ test("a signal's own environment is what the deploy named for it", () => {
 test("the release is the version Kamal deployed", () => {
   assert.equal(readSettings({ KAMAL_VERSION: "abc123" }).release, "abc123");
 });
+
+test("the paths that start no trace default to /health", () => {
+  assert.deepEqual(readSettings({}).tracesIgnoredPaths, ["/health"]);
+});
+
+test("TRACES_IGNORED_PATHS names the paths that start no trace", () => {
+  assert.deepEqual(
+    readSettings({ TRACES_IGNORED_PATHS: "/api/health, /socket.io/" })
+      .tracesIgnoredPaths,
+    ["/api/health", "/socket.io/"],
+  );
+});
