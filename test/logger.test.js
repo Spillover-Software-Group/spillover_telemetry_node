@@ -70,3 +70,66 @@ test("a console.error names its error by class and message", async () => {
     { type: "TypeError", message: "wrapped" },
   );
 });
+
+async function redactedRun() {
+  const { stdout, stderr } = await runFixture("redact.js", ENV);
+  return {
+    output: stdout + stderr,
+    lines: stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line)),
+  };
+}
+
+test("a password in a URL appears nowhere a process writes", async () => {
+  const { output } = await redactedRun();
+
+  assert.equal(output.includes("PLANTED-SECRET"), false);
+});
+
+test("a URL's scheme, user and host stay in the line", async () => {
+  const { lines } = await redactedRun();
+
+  assert.equal(
+    lines[0].msg,
+    "connecting to mongodb://senalysis:***@ac-1.example.net:27017,ac-2.example.net:27017/db",
+  );
+});
+
+test("a field and a nested field are redacted", async () => {
+  const { lines } = await redactedRun();
+
+  assert.deepEqual(
+    [lines[0].uri, lines[0].nested.connection.uri],
+    [
+      "mongodb://senalysis:***@ac-1.example.net:27017,ac-2.example.net:27017/db",
+      "mongodb://senalysis:***@ac-1.example.net:27017,ac-2.example.net:27017/db",
+    ],
+  );
+});
+
+test("an error's message and stack are redacted", async () => {
+  const { lines } = await redactedRun();
+  const { err } = lines[1];
+
+  assert.deepEqual(
+    [
+      err.message.includes("senalysis:***@"),
+      err.stack.includes("senalysis:***@"),
+    ],
+    [true, true],
+  );
+});
+
+test("Node's warning for a legacy parse of the URL is redacted", async () => {
+  const { lines } = await redactedRun();
+
+  assert.equal(
+    lines.some(
+      (line) =>
+        line.msg?.includes("DEP0170") && line.msg.includes("senalysis:***@"),
+    ),
+    true,
+  );
+});

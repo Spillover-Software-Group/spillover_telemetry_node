@@ -183,3 +183,31 @@ test("captureError reports the same error once", () => {
 test("captureError sends nothing for what is not an Error", () => {
   assert.equal(scopeEvents.length, 4);
 });
+
+test("a password in a URL reaches Sentry in no event and no breadcrumb", async () => {
+  const recorder = await recordingServer();
+  await runFixture("redact-sentry.js", {
+    SENTRY_DSN: `${recorder.url.replace("http://", "http://publickey@")}/1`,
+    KAMAL_DESTINATION: "staging",
+  });
+  const bodies = recorder.requests.map(({ body }) => body).join("\n");
+  const [event] = sentryEvents(recorder.requests);
+  await recorder.close();
+
+  assert.deepEqual(
+    {
+      secretSent: bodies.includes("PLANTED-SECRET"),
+      message: event?.exception?.values?.[0]?.value,
+      breadcrumb: event?.breadcrumbs?.find(
+        (crumb) => crumb.category === "console",
+      )?.message,
+    },
+    {
+      secretSent: false,
+      message:
+        "connect ECONNREFUSED mongodb://senalysis:***@ac-1.example.net:27017/db",
+      breadcrumb:
+        "The URL mongodb://senalysis:***@ac-1.example.net:27017/db is invalid.",
+    },
+  );
+});

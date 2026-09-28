@@ -1,5 +1,6 @@
 import { format } from "node:util";
 import pino from "pino";
+import { redactCredentials } from "./redact.js";
 
 // JSON lines on stdout, each stamped with the application and the environment the metrics and the
 // errors beside it report, so a staging container's lines never read as production. The log driver
@@ -9,6 +10,9 @@ export function createLogger(settings, { destination } = {}) {
     base: { app: settings.app, environment: settings.environment() },
     timestamp: pino.stdTimeFunctions.isoTime,
     formatters: { level: (label) => ({ level: label }) },
+    // Every line as it is written, whatever made it: the message, an error's message and stack, and
+    // every string field, the console bridge's included.
+    hooks: { streamWrite: redactCredentials },
   };
 
   if (settings.development && !destination) {

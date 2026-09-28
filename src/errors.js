@@ -1,9 +1,23 @@
+import { redactCredentials } from "./redact.js";
 import { state } from "./state.js";
 
 // Of the request an error happened in, Sentry is told the method, the URL without its query and the
 // User-Agent's value, which tells a browser from another service calling. No cookie, no body, no
 // other header: a Referer can carry another page's query, and an Authorization header is a token.
+// Every string in an event, however deep: an exception's message, a breadcrumb (Sentry records each
+// console call as one, so a warning printed earlier rides along on the next error), a context.
+function redactDeep(value) {
+  if (typeof value === "string") return redactCredentials(value);
+  if (Array.isArray(value)) return value.map(redactDeep);
+  if (value && typeof value === "object") {
+    for (const key of Object.keys(value)) value[key] = redactDeep(value[key]);
+  }
+  return value;
+}
+
 export function scrubEvent(event) {
+  redactDeep(event);
+
   const { request } = event;
   if (!request) return event;
 

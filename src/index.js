@@ -16,6 +16,7 @@ export {
   runtimeCollector,
   startMetrics,
 } from "./metrics.js";
+export { redactCredentials } from "./redact.js";
 export { startRequest } from "./requests.js";
 export { readSettings } from "./settings.js";
 

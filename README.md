@@ -42,6 +42,13 @@ env:
 argument becomes fields of the line, and an Error becomes `err` with its class, message and stack.
 In development (no destination, `NODE_ENV=development`) lines are pretty-printed.
 
+**A password in a URL is never written.** Every line, however it was made, has its URLs'
+credentials replaced: `scheme://user:secret@host` becomes `scheme://user:***@host`, in the message,
+an error's message and stack, and every field. So has every event sent to Sentry, breadcrumbs
+included, since Sentry records each console call as one. A connection string reaches a log by
+paths nobody chose, such as Node's warning when a library parses a multi-host URL with `url.parse`.
+`redactCredentials(text)` is the same function, for an application's own use.
+
 **Metrics.** One CloudWatch Embedded Metric Format document a minute, a whole line on stdout, in
 namespace `CLOUDWATCH_METRICS_NAMESPACE`, with the dimensions `App`, `Environment` and `Role`.
 The shape is exactly the gem's. A process reports only if it calls `startMetrics()`: the

@@ -1,6 +1,6 @@
 {
   "name": "@spillover/telemetry",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "How a Spillover Node application reports on itself: JSON logs, runtime metrics, errors to Sentry and traces to OTLP, each off until its variable is set.",
   "license": "MIT",
   "type": "module",
