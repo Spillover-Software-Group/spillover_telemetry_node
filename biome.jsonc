@@ -1,0 +1,100 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "ignoreUnknown": false
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        "noImplicitCoercions": "error",
+        "noRedundantDefaultExport": "error",
+        "noUselessCatchBinding": "error",
+        "noUselessUndefined": "error",
+        "useMaxParams": "error",
+        // A ceiling, not a target: what it catches is the task handler nobody meant to grow.
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 20 }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": {
+            "maxLines": 120,
+            "skipBlankLines": true,
+            "skipIifes": true
+          }
+        }
+      },
+      "correctness": {
+        // Catches an import path, an exported symbol or a package that does not exist: an
+        // instrumentation or SDK imported by name only when its signal is on would otherwise fail
+        // in production and nowhere else.
+        "noUnresolvedImports": "error",
+        "noUndeclaredVariables": "error",
+        "noUndeclaredDependencies": "error"
+      },
+      "performance": {
+        "noAwaitInLoops": "error"
+      },
+      "style": {
+        "noExcessiveLinesPerFile": {
+          "level": "error",
+          "options": { "maxLines": 500, "skipBlankLines": true }
+        }
+      },
+      "suspicious": {
+        "noEmptyBlockStatements": "error",
+        "noEqualsToNull": "error",
+        "noImportCycles": "error",
+        "noMisplacedAssertion": "error",
+        "noShadow": "error",
+        "noUnusedExpressions": "error",
+        "useAwait": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // `node:test` awaits every test callback, so a synchronous body is still declared `async`,
+      // and a mock that swallows a call is deliberately empty. The size ceilings are for
+      // production code: a long test file is a long test file.
+      "includes": ["test/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off",
+            "noExcessiveLinesPerFunction": "off"
+          },
+          "style": { "noExcessiveLinesPerFile": "off" },
+          "suspicious": { "noEmptyBlockStatements": "off", "useAwait": "off" }
+        }
+      }
+    }
+  ]
+}
