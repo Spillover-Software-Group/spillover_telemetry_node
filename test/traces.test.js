@@ -122,6 +122,16 @@ test("a job's span asks X-Ray's exporter to index those three as annotations", (
   assert.deepEqual(listed, ["job_queue", "job_name", "job_id"]);
 });
 
+test("a job is a BullMQ job unless it names its library", () => {
+  assert.equal(attribute(jobSpan(), "messaging.system"), "bullmq");
+});
+
+test("a job that names its library carries that name", () => {
+  const pulseJob = spans.find(({ name }) => name === "pulse items.unsnooze");
+
+  assert.equal(attribute(pulseJob, "messaging.system"), "pulse");
+});
+
 test("an outbound call inside a job names its host as the dependency", () => {
   const call = spans.find((span) =>
     attribute(span, "url.full")?.endsWith("/inside-a-job"),

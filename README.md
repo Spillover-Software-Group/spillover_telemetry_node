@@ -80,8 +80,9 @@ applies the rule where it calls `captureJobFailure`, because only it knows its c
 - `identifyUser({ id, email, ipAddress })` names the user for the current request or job.
 - `clientAddress()` is Koa middleware that gives each request a scope of its own, named by `ctx.ip`,
   which is the client's only with `app.proxy = true` behind the load balancer and kamal-proxy.
-- `runJob({ queue, name, id }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`, and in
-  a trace of its own.
+- `runJob({ queue, name, id, system }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`,
+  and in a trace of its own. `system` is the library that runs the job (`messaging.system` on its
+  span), `bullmq` unless given.
 - `startRequest(name, annotations)` is a unit of work the SDK does not see as a request, such as a
   Socket.IO action: `run(fn)` runs `fn` in a scope and a trace of its own, and `end(error)` ends the
   trace's span, as failed where an error is given, whenever the unit is answered, which may be long
