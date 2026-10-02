@@ -13,6 +13,7 @@ export { bridgeConsole, createLogger } from "./logger.js";
 export {
   bullmqCollector,
   emfDocument,
+  pulseCollector,
   runtimeCollector,
   startMetrics,
 } from "./metrics.js";
@@ -26,12 +27,12 @@ export function getLogger() {
   return state.logger;
 }
 
-function traced({ queue, name, id }, fn) {
+function traced({ queue, name, id, system = "bullmq" }, fn) {
   const { tracer, api } = state;
   if (!tracer) return fn();
 
   const attributes = {
-    "messaging.system": "bullmq",
+    "messaging.system": system,
     "messaging.destination.name": queue,
     "messaging.operation.type": "process",
     "messaging.message.id": String(id),
@@ -69,7 +70,7 @@ function traced({ queue, name, id }, fn) {
 
 // Runs one job as a unit of its own: a trace of its own, whose Redis, Mongo and HTTP calls are its
 // spans, and a Sentry scope tagged with its queue, name and id, so an error raised inside names the
-// job it happened in.
+// job it happened in. `system` is the library that ran it, BullMQ unless the job names another.
 export async function runJob(job, fn) {
   const { Sentry } = state;
   if (!Sentry) return await traced(job, fn);
