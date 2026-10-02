@@ -62,9 +62,18 @@ document a minute.
 | | `ActiveHandles`, `Heartbeat` (always 1: alarm on missing data) | Count |
 | `bullmqCollector({ queues, workers })` | `JobsWaiting` (waiting and prioritized), `JobsDelayed`, `JobsActive` | Count |
 | | `JobsCompleted`, `JobsFailed` (final failures only), since the last document | Count |
+| `pulseCollector({ pulse })` | `JobsWaiting` (due, enabled, unlocked, of a name the process defines) | Count |
+| | `OldestReadyJobAge`, how long ago the oldest of those fell due | Seconds |
+| | `JobsFailed` (every failed run: Pulse marks no final failure), since the last document | Count |
 
 A value with nothing to measure yet is left out rather than sent as zero. An application collector
 is `{ units, values() }`, where `values` may be async and every name has a unit.
+
+Pulse keeps its jobs in a Mongo collection, so `JobsWaiting` and `OldestReadyJobAge` are the same
+from every process that reports them and are read as a Maximum; `JobsFailed` is each process's own
+and is read as a Sum. A job of a name nothing defines is never run, so it is not waiting; a job a
+process has locked and holds until a slot frees is not either. `OldestReadyJobAge` has the Rails
+gem's name and meaning.
 
 **Errors.** Sentry, errors only (no sample rate, `sendDefaultPii: false`), with the
 environment and the release (`KAMAL_VERSION`). Of a request, an error keeps the method, the URL

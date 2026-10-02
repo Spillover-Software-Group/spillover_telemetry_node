@@ -13,6 +13,7 @@ export { bridgeConsole, createLogger } from "./logger.js";
 export {
   bullmqCollector,
   emfDocument,
+  pulseCollector,
   runtimeCollector,
   startMetrics,
 } from "./metrics.js";
