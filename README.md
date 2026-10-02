@@ -156,4 +156,7 @@ npm test        # node:test, against local servers standing in for Sentry and th
 node bin/check-xray-names.js   # the spans through the real awsxray exporter, in Docker
 ```
 
-Node 22.12 or newer, and 24. There is no CI: the gate is `npm run check && npm test`, by exit code.
+Node 20.19 or newer on the 20 line, 22.12 or newer, and 24: from those versions an application
+written in CommonJS can `require` this package, which is an ES module. The suite runs on the
+`mise.toml` Node; run it under each line's Node too when a change could differ between them. There
+is no CI: the gate is `npm run check && npm test`, by exit code.
