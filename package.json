@@ -30,6 +30,7 @@
     "@opentelemetry/instrumentation-ioredis": "0.70.0",
     "@opentelemetry/instrumentation-koa": "0.70.0",
     "@opentelemetry/instrumentation-mongodb": "0.75.0",
+    "@opentelemetry/instrumentation-redis": "0.70.0",
     "@opentelemetry/instrumentation-undici": "0.32.0",
     "@opentelemetry/sdk-node": "0.222.0",
     "@sentry/node": "10.75.3",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
     "@pulsecron/pulse": "1.6.7",
-    "mongodb-memory-server": "11.2.0"
+    "mongodb-memory-server": "11.2.0",
+    "redis": "4.7.0"
   }
 }

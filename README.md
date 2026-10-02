@@ -106,9 +106,12 @@ applies the rule where it calls `captureJobFailure`, because only it knows its c
   by what went wrong. `isFinalFailure(job, error)` says whether BullMQ will try the job again.
 
 **Traces.** OpenTelemetry's Node SDK, exporting OTLP over HTTP to the endpoint, with the http,
-undici (fetch), Express, Koa, MongoDB and ioredis instrumentations, and no metrics or logs
-pipeline. A call to Redis, Mongo or another service is traced only inside a request or a job, so a
-worker's own polling is not a trace a second. A request for one of `TRACES_IGNORED_PATHS` (by
+undici (fetch), Express, Koa, MongoDB, ioredis and node-redis (`redis` v4 and v5) instrumentations,
+and no metrics or logs pipeline. A call to Redis, Mongo or another service is traced only inside a
+request or a job, so a worker's own polling is not a trace a second; a call span with nothing above
+it, such as node-redis's connect, which its instrumentation cannot be told to skip, is left out of
+the export. A node-redis command's span records the command's name and none of its arguments, which
+are the keys and values themselves. A request for one of `TRACES_IGNORED_PATHS` (by
 default `/health`) is not traced: a health check, or a transport's own polling. The sampler is the SDK's, so
 `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG` work as documented.
 
