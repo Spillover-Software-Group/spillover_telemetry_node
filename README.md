@@ -11,7 +11,7 @@ loaded.
 ## Installing it
 
 ```json
-"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.2"
+"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.6"
 ```
 
 Pinned to a tag. Then start the process through it, so it is set up before the application's first
