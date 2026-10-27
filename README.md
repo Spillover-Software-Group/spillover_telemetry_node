@@ -87,6 +87,8 @@ throw) reaches Sentry once, at its final failure, with the same fields as tags. 
 applies the rule where it calls `captureJobFailure`, because only it knows its classified error.
 
 - `identifyUser({ id, email, ipAddress })` names the user for the current request or job.
+- `tagRequest(tags)` tags every error the current request or job reports with what it is about (a
+  restaurant, an account): searchable in Sentry, values sent as strings, empty ones left out.
 - `clientAddress()` is Koa middleware that gives each request a scope of its own, named by `ctx.ip`,
   which is the client's only with `app.proxy = true` behind the load balancer and kamal-proxy.
 - `runJob({ queue, name, id, system }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`,

@@ -83,6 +83,22 @@ export function identifyUser({ id, email, ipAddress } = {}) {
   });
 }
 
+// Tags every error the current request or job reports with what it is about (a restaurant, an
+// account), searchable beside the user identifyUser names. Values are strings in Sentry; empty ones
+// are left out.
+export function tagRequest(tags = {}) {
+  const { Sentry } = state;
+  if (!Sentry) return;
+
+  Sentry.getIsolationScope().setTags(
+    Object.fromEntries(
+      Object.entries(withoutEmpty(tags))
+        .filter(([, value]) => value !== null)
+        .map(([key, value]) => [key, String(value)]),
+    ),
+  );
+}
+
 // Koa middleware: each request gets a scope of its own, named by the client's address. `ctx.ip` is
 // the client's only where the application trusts its proxies (`app.proxy = true`), since behind the
 // load balancer and kamal-proxy the socket's address is a proxy's.

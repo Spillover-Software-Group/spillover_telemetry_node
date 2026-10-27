@@ -8,6 +8,7 @@ export {
   clientAddress,
   identifyUser,
   isFinalFailure,
+  tagRequest,
 } from "./errors.js";
 export { bridgeConsole, createLogger } from "./logger.js";
 export {

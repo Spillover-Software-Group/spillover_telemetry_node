@@ -154,6 +154,22 @@ test("two units of work started at once each keep their own user", () => {
   );
 });
 
+test("two units of work started at once each keep their own tags", () => {
+  assert.deepEqual(
+    [
+      scopeEvent("raised in POSTS_GET")?.tags?.restaurant,
+      scopeEvent("raised in REVIEWS_GET")?.tags?.restaurant,
+    ],
+    ["POSTS_GET place", "REVIEWS_GET place"],
+  );
+});
+
+test("tagRequest sends its values as strings and leaves empty ones out", () => {
+  const { tags } = scopeEvent("raised in POSTS_GET");
+
+  assert.deepEqual([tags.restaurant_id, "empty" in tags], ["30", false]);
+});
+
 test("captureError reports an error with its tags", () => {
   const event = scopeEvent(
     "Cannot read properties of undefined (reading 'type')",
