@@ -1,6 +1,6 @@
-// Two units of work started with startRequest at once, each naming its user and raising an error
-// after the other has started; then errors reported with captureError, one of them twice with
-// another between.
+// Two units of work started with startRequest at once, each naming its user, tagging what it is
+// about and raising an error after the other has started; then errors reported with captureError,
+// one of them twice with another between.
 import { setTimeout as delay } from "node:timers/promises";
 import * as Sentry from "@sentry/node";
 import {
@@ -8,12 +8,18 @@ import {
   flushTelemetry,
   identifyUser,
   startRequest,
+  tagRequest,
 } from "../../src/index.js";
 
 async function action(type, userId, waitMs) {
   const request = startRequest(`socket ${type}`, { action: type });
   await request.run(async () => {
     identifyUser({ id: userId, email: `${userId}@example.com` });
+    tagRequest({
+      restaurant: `${type} place`,
+      restaurant_id: waitMs,
+      empty: "",
+    });
     await delay(waitMs);
     Sentry.captureException(new Error(`raised in ${type}`));
   });
