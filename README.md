@@ -11,7 +11,7 @@ loaded.
 ## Installing it
 
 ```json
-"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.2"
+"@spillover/telemetry": "github:Spillover-Software-Group/spillover_telemetry_node#v0.1.6"
 ```
 
 Pinned to a tag. Then start the process through it, so it is set up before the application's first
@@ -62,9 +62,18 @@ document a minute.
 | | `ActiveHandles`, `Heartbeat` (always 1: alarm on missing data) | Count |
 | `bullmqCollector({ queues, workers })` | `JobsWaiting` (waiting and prioritized), `JobsDelayed`, `JobsActive` | Count |
 | | `JobsCompleted`, `JobsFailed` (final failures only), since the last document | Count |
+| `pulseCollector({ pulse })` | `JobsWaiting` (due, enabled, unlocked, of a name the process defines) | Count |
+| | `OldestReadyJobAge`, how long ago the oldest of those fell due | Seconds |
+| | `JobsFailed` (every failed run: Pulse marks no final failure), since the last document | Count |
 
 A value with nothing to measure yet is left out rather than sent as zero. An application collector
 is `{ units, values() }`, where `values` may be async and every name has a unit.
+
+Pulse keeps its jobs in a Mongo collection, so `JobsWaiting` and `OldestReadyJobAge` are the same
+from every process that reports them and are read as a Maximum; `JobsFailed` is each process's own
+and is read as a Sum. A job of a name nothing defines is never run, so it is not waiting; a job a
+process has locked and holds until a slot frees is not either. `OldestReadyJobAge` has the Rails
+gem's name and meaning.
 
 **Errors.** Sentry, errors only (no sample rate, `sendDefaultPii: false`), with the
 environment and the release (`KAMAL_VERSION`). Of a request, an error keeps the method, the URL
@@ -80,8 +89,9 @@ applies the rule where it calls `captureJobFailure`, because only it knows its c
 - `identifyUser({ id, email, ipAddress })` names the user for the current request or job.
 - `clientAddress()` is Koa middleware that gives each request a scope of its own, named by `ctx.ip`,
   which is the client's only with `app.proxy = true` behind the load balancer and kamal-proxy.
-- `runJob({ queue, name, id }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`, and in
-  a trace of its own.
+- `runJob({ queue, name, id, system }, fn)` runs a job in a scope tagged `queue`, `job` and `job_id`,
+  and in a trace of its own. `system` is the library that runs the job (`messaging.system` on its
+  span), `bullmq` unless given.
 - `startRequest(name, annotations)` is a unit of work the SDK does not see as a request, such as a
   Socket.IO action: `run(fn)` runs `fn` in a scope and a trace of its own, and `end(error)` ends the
   trace's span, as failed where an error is given, whenever the unit is answered, which may be long
@@ -96,9 +106,12 @@ applies the rule where it calls `captureJobFailure`, because only it knows its c
   by what went wrong. `isFinalFailure(job, error)` says whether BullMQ will try the job again.
 
 **Traces.** OpenTelemetry's Node SDK, exporting OTLP over HTTP to the endpoint, with the http,
-undici (fetch), Express, Koa, MongoDB and ioredis instrumentations, and no metrics or logs
-pipeline. A call to Redis, Mongo or another service is traced only inside a request or a job, so a
-worker's own polling is not a trace a second. A request for one of `TRACES_IGNORED_PATHS` (by
+undici (fetch), Express, Koa, MongoDB, ioredis and node-redis (`redis` v4 and v5) instrumentations,
+and no metrics or logs pipeline. A call to Redis, Mongo or another service is traced only inside a
+request or a job, so a worker's own polling is not a trace a second; a call span with nothing above
+it, such as node-redis's connect, which its instrumentation cannot be told to skip, is left out of
+the export. A node-redis command's span records the command's name and none of its arguments, which
+are the keys and values themselves. A request for one of `TRACES_IGNORED_PATHS` (by
 default `/health`) is not traced: a health check, or a transport's own polling. The sampler is the SDK's, so
 `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG` work as documented.
 
@@ -156,4 +169,7 @@ npm test        # node:test, against local servers standing in for Sentry and th
 node bin/check-xray-names.js   # the spans through the real awsxray exporter, in Docker
 ```
 
-Node 22.12 or newer, and 24. There is no CI: the gate is `npm run check && npm test`, by exit code.
+Node 20.19 or newer on the 20 line, 22.12 or newer, and 24: from those versions an application
+written in CommonJS can `require` this package, which is an ES module. The suite runs on the
+`mise.toml` Node; run it under each line's Node too when a change could differ between them. There
+is no CI: the gate is `npm run check && npm test`, by exit code.

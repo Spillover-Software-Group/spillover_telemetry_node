@@ -55,6 +55,35 @@ function dependencyNamer(api) {
   };
 }
 
+// A call made outside any request or job is not a unit of work, and every instrumentation here is told
+// to trace a call only inside one. node-redis's cannot be told so for its connect, which it traces as a
+// root span of its own each time a client connects: at every start and every reconnect, with nothing
+// above it. This leaves such a span out of the export, so the rule holds for every instrumentation.
+function onlyCallsInsideWork(exporter, api, ExportResultCode) {
+  return {
+    export(spans, resultCallback) {
+      const kept = spans.filter(
+        (span) =>
+          span.kind !== api.SpanKind.CLIENT ||
+          span.parentSpanContext !== undefined,
+      );
+      if (kept.length === 0) {
+        resultCallback({ code: ExportResultCode.SUCCESS });
+        return;
+      }
+      exporter.export(kept, resultCallback);
+    },
+    forceFlush: () => exporter.forceFlush(),
+    shutdown: () => exporter.shutdown(),
+  };
+}
+
+// node-redis's arguments are the keys and values themselves (an order's idempotency key, a PosHub
+// handoff's token), so a command's span records its name and nothing it was given.
+function commandNameOnly(command) {
+  return command;
+}
+
 // Whether an incoming request's path is one that starts no trace (settings' tracesIgnoredPaths).
 export function isIgnoredPath(url, ignoredPaths) {
   const path = (url ?? "").split("?")[0];
@@ -75,7 +104,7 @@ export async function installTraces({
 
   const [
     api,
-    { setGlobalErrorHandler },
+    { ExportResultCode, setGlobalErrorHandler },
     { NodeSDK, tracing },
     { OTLPTraceExporter },
     { HttpInstrumentation },
@@ -84,6 +113,7 @@ export async function installTraces({
     { KoaInstrumentation },
     { MongoDBInstrumentation },
     { IORedisInstrumentation },
+    { RedisInstrumentation },
   ] = await Promise.all([
     import("@opentelemetry/api"),
     import("@opentelemetry/core"),
@@ -95,6 +125,7 @@ export async function installTraces({
     import("@opentelemetry/instrumentation-koa"),
     import("@opentelemetry/instrumentation-mongodb"),
     import("@opentelemetry/instrumentation-ioredis"),
+    import("@opentelemetry/instrumentation-redis"),
   ]);
 
   if (logger) reportThrough(logger, api, setGlobalErrorHandler);
@@ -105,7 +136,9 @@ export async function installTraces({
     // OTEL_SERVICE_NAME, never a string here.
     spanProcessors: [
       dependencyNamer(api),
-      new tracing.BatchSpanProcessor(new OTLPTraceExporter()),
+      new tracing.BatchSpanProcessor(
+        onlyCallsInsideWork(new OTLPTraceExporter(), api, ExportResultCode),
+      ),
     ],
     // Traces only: CloudWatch has the metrics (embedded in the log) and the logs.
     metricReaders: [],
@@ -127,6 +160,10 @@ export async function installTraces({
       new KoaInstrumentation(),
       new MongoDBInstrumentation({ requireParentSpan: true }),
       new IORedisInstrumentation({ requireParentSpan: true }),
+      new RedisInstrumentation({
+        requireParentSpan: true,
+        dbStatementSerializer: commandNameOnly,
+      }),
     ],
   });
 

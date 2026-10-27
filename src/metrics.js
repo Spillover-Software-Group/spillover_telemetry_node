@@ -135,6 +135,63 @@ export function bullmqCollector({ queues, workers }) {
   };
 }
 
+// Pulse's jobs (@pulsecron/pulse, Agenda's successor), which live in a Mongo collection rather than
+// in queues: how many are due with no process holding them, how long the oldest of those has been
+// due, and how many runs failed in this process since the last document.
+//
+// Waiting means what Pulse itself would pick up next: due, not disabled, not locked, and of a name
+// this process defines. A job of a name nobody defines any more is never run, so counting it would
+// hold the number and the age up for good. A job a process has locked and holds in memory until one
+// of its slots frees is not counted. The two counts are about the collection, the same from every
+// process that reports them, so they are read as a Maximum; the failures are this process's own, read
+// as a Sum. Pulse records no final failure apart from any other, so every failed run counts.
+export function pulseCollector({ pulse, now = () => new Date() }) {
+  let failed = 0;
+  pulse.on("fail", () => {
+    failed += 1;
+  });
+
+  return {
+    units: {
+      JobsWaiting: "Count",
+      OldestReadyJobAge: "Seconds",
+      JobsFailed: "Count",
+    },
+    async values() {
+      // Taken before the queries, so a failure while they run counts in the next document, and given
+      // back if they fail, so it is not lost with this one.
+      const failures = failed;
+      failed = 0;
+
+      const at = now();
+      const waiting = {
+        name: { $in: Object.keys(pulse._definitions) },
+        disabled: { $ne: true },
+        lockedAt: { $eq: null },
+        nextRunAt: { $lte: at },
+      };
+
+      try {
+        const [count, [oldest]] = await Promise.all([
+          pulse.countJobs(waiting),
+          pulse.getJobsRepo(waiting, { nextRunAt: 1 }, 1),
+        ]);
+
+        return {
+          JobsWaiting: count,
+          OldestReadyJobAge: oldest
+            ? Math.round((at.getTime() - oldest.nextRunAt.getTime()) / 1000)
+            : undefined,
+          JobsFailed: failures,
+        };
+      } catch (error) {
+        failed += failures;
+        throw error;
+      }
+    },
+  };
+}
+
 const OFF = Object.freeze({
   publish: () => Promise.resolve(),
   stop: () => undefined,
